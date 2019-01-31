@@ -38,7 +38,7 @@ Software covered:
 ### Day 3: Statistics
 
 * T-test
-* *ANOVA
+* ANOVA
 * Regressions
 * Correlations
 
