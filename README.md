@@ -1,4 +1,4 @@
-# RCourse2019
+# R Course 2019
 
 R course made for the Red Sea Research Center (RSCR) of KAUST in January 2019.
 This course assume no previous experience in programming.
@@ -10,9 +10,9 @@ Software covered:
 
 ## Instructors
 
-* Tamara Huete Stauffer <tamara.huetestauffer@kasut.edu.sa>
+* Tamara Huete Stauffer <tamara.huetestauffer@kaust.edu.sa>
 * Grégoire Michoud <gregoire.michoud@kaust.edu.sa>
-* Daffne López-Sandoval <daffne.lopezsandoval@kasut.edu.sa>
+* Daffne López-Sandoval <daffne.lopezsandoval@kaust.edu.sa>
 
 ## Syllabus
 
