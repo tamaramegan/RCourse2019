@@ -1,0 +1,86 @@
+---
+title: "Base Plot in R"
+author: "Gregoire Michoud"
+date: "02/01/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Base Plot in R
+
+One of the most powerful functions of R is it's ability to produce a wide range of graphics to quickly and easily visualise data. Plots can be replicated, modified and even publishable with just a handful of commands.
+
+For this, we are going to use the `airquality` dataset, which measure the daily air quality in New York from May to September 1973, with 6 variables :
+
+* Ozone: Mean ozone in parts per billion from 1300 to 1500 hours at Roosevelt Island
+* Solar.R: Solar radiation in Langleys in the frequency band 4000–7700 Angstroms from 0800 to 1200 hours at Central Park
+* Wind: Average wind speed in miles per hour at 0700 and 1000 hours at LaGuardia Airport
+* Temp: Maximum daily temperature in degrees Fahrenheit at La Guardia Airport.
+* Month
+* Day
+
+```{r}
+data(airquality)
+head(airquality)
+```
+
+
+As you can see all variables are numerical, so we will create a factorial variable for plotting purposes later on
+
+```{r}
+airquality$Solar.R_cat<-cut(airquality$Solar.R, c(0,50,100,150,200,250,300,350))
+airquality$Solar.R_cat
+```
+
+### Histograms
+
+A very simple histogram to find the frequency of the temperature
+
+```{r}
+hist(airquality$Temp)
+```
+
+A more complex one with the title, x label and we changed the number of cells to 20
+
+```{r}
+hist(airquality$Temp, breaks = 20, xlab = "Temperature (degrees F)",
+     main = "Histogram of Temperature in New from May to September 1973",
+     ylab = "Frequency of Temperature",
+     ylim = c(0,20),
+     xlim = c(50,100)
+)
+```
+
+### Scatterplot
+
+A simple scatter plot to compare the ozone concentration and the wind
+
+```{r}
+plot(x = airquality$Ozone, y = airquality$Wind)
+```
+
+It seems to be negatively correlated, does the solar radiation play a role ?
+
+```{r}
+plot(x = airquality$Ozone,
+     y = airquality$Wind,
+     col = airquality$Solar.R_cat,
+     pch = 16,
+     xlab = "Ozone in parts per billion", 
+     ylab = "Average wind speed (mph)")
+legend(title = "Solar radiation (lang)", x = 120, y = 20, legend = levels(airquality$Solar.R_cat), col = c(1:7), pch = 16)
+```
+
+### Boxplot
+
+Another type of plot
+
+```{r}
+boxplot(airquality$Wind ~ airquality$Solar.R_cat,
+        ylab = "Average wind speed (mph)",
+        xlab = "Solar radiation (lang)")
+```

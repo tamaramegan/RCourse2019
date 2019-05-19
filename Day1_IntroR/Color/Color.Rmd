@@ -1,0 +1,87 @@
+---
+title: "Colors in R"
+author: "Tamara Huete-Stauffer"
+date: "12/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(RColorBrewer)
+```
+
+## Colors in R
+
+Here you can find the available colors in R
+<http://research.stowers.org/mcm/efg/R/Color/Chart/>
+
+And here is a web page that helps you decide which palette to use
+<http://colorbrewer2.org/>
+
+#### 1. Accessing individual colors
+```{r naming colors}
+## 3 ways of accessing individual colors: 
+### by name   = "aquamarine4" 
+### by number = colors()[12]
+### by hexadecimal code = "#458B74"
+
+plot(x=1:10, y=1:10, col="aquamarine4", pch=15,cex=1.2) ## name
+points(x=1:10,y=2:11, col=colors()[12], pch=16,cex=1.2) ## number
+points(x=1:10, y=3:12, col="#458B74",pch=17,cex=1.2) ## hex code
+legend(x=8, y=4, legend=c("aquamarine4","colors()[12]","#458B74"),pch=c(15,16,17), col=c(colors()[12],"aquamarine4","#458B74"))
+
+
+```
+
+#### 2. Using RColorBrewer palettes
+```{r display}
+## These are the available built-in palettes
+par(cex=0.7) ## cex regulates the size of the font
+display.brewer.all()
+
+## Display color blind friendly palettes
+display.brewer.all(colorblindFriendly=TRUE)
+
+## View a single RColorBrewer palette by specifying its name and number of colors you need
+par(mfrow=c(1,3))
+display.brewer.pal(n=9,name = 'RdBu')
+display.brewer.pal(n=11,name = 'Spectral')
+display.brewer.pal(n=5,name = 'Spectral')
+
+```
+
+Select the number of colors you need depending on the number of cases in your plot
+```{r bars}
+## Select the number of colors you need.
+## If you select less colors than the number of x-y points, they will be repeated
+par(mfrow=c(1,2)) ### make a 2 by 2 window to plot 4 plots at the same time
+barplot(c(1,2,5,7,6,7), col=brewer.pal(n = 6, name = "Spectral"),main="Spectral, n = 6")
+barplot(c(1,2,5,7,6,7), col=brewer.pal(n = 3, name = "Spectral"), main="Spectral, n = 3")
+brewer.pal(n=9,name ="Spectral")
+
+```
+
+Use colorRampPalette() to extend the maximum number of breaks in the built-in palettes
+```{r colorRampPalette}
+
+## the palettes have a maximum number of breaks, but you can extend them with colorRampPalette()
+Pal100 <- colorRampPalette(brewer.pal(9,"Spectral"))(100) ### 100 colors of the Spectral palette
+Pal50 <- colorRampPalette(brewer.pal(9,"Spectral"))(50) ### 50 colors of the Spectral palette
+
+par(mfrow=c(1,2))
+plot(x=1:100,y=1:100,col=Pal100,cex=2,pch=19, main="Spectral, n=100") ## 100 Spectral palette
+plot(x=1:100,y=1:100,col=colorRampPalette(brewer.pal(9,"Blues"))(100),cex=2,pch=19,main="Blues, n=100") ## 100 Blues palette
+
+
+```
+
+Or make your own palettes!!
+```{r customize palette}
+## or you can make your own
+myPal <- colorRampPalette(c("blue","cyan","orange","firebrick1"))
+
+par(mfrow=c(1,2))
+plot(x=1:10,y=1:10,col=myPal(10),cex=2,pch=19, main="myPal, n=10")
+plot(x=1:100,y=1:100,col=myPal(100),cex=2,pch=19,main="myPal, n=100")
+```
+

@@ -1,0 +1,80 @@
+---
+title: "R markdown tutorial"
+author: "Tamara Huete-Stauffer"
+date: "12/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#This is the setup chunk, you can add options here, like the directory
+knitr::opts_chunk$set(echo = TRUE, root.dir="path/to/files")
+## By default, the working directory is the folder where your file is. 
+## If you want another location, set root.dir to the folder from where to get the files are. It will work when you press knit, but while you are working, you will have to setwd() to that path in the terminal directly.
+
+## load the libraries you will need here
+```
+
+## 1. R Markdown Introduction
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## 2. Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=TRUE}
+plot(pressure)
+```
+
+You can change the size of the plots with fig.height() and fig.width()
+
+```{r pressure 2, echo=FALSE, fig.height=4, fig.width=4}
+plot(pressure)
+```
+
+Important commands for the code chunks are:
+
+* `echo = FALSE`: get the plot but not the commands
+* `echo = TRUE`: get the plot and the commands  
+* `include = FALSE`: do not include the chunk in the output, but run it 
+* `include = TRUE`: include the chunck in the output 
+* `results = FALSE`: show code but don't show the results
+
+## 3. Text sizes
+
+# Header 1
+## Header 2
+### Header 3
+#### Header 4
+##### Header 5
+
+## 4. Text formats
+
+- *italics*
+- **bold**
+- `code`
+- links: <http://www.rmarkdown.rstudio.com>
+- Equations: $E = mc^{2}$
+
+## 5. Include images
+
+In order for this to work, the image should be in the same folder where you saved the Rmarkdown document.
+
+![Kaust logo](kaust.png) 
+
+## 6. Check out more options:
+* Add tables
+* Add biliography
+* text formats
+
+<http://www.rstudio.com/wp-content/uploads/2016/03/rmarkdown-cheatsheet-2.0.pdf>
+
+<https://yihui.name/knitr/>
+
+<http://rmarkdown.rstudio.com>
