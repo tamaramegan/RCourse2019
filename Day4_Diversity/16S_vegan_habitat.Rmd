@@ -1,0 +1,552 @@
+---
+title: "16S_vegan_tutorial"
+author: "Tamara Huete-Stauffer/Gregoire Michoud: tamara.huete@gmail.com/gregoire.michoud@gmail.com"
+date: "12/11/2018"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(include = TRUE) #, root.dir="path/to/files")
+knitr::opts_chunk$set(include = TRUE)#, root.dir="path/to/files")
+library(vegan)
+library(ggplot2)
+library(ade4)
+library(ggvegan)
+library(reshape2)
+library(RColorBrewer)
+library(pairwiseAdonis)
+```
+
+# 16S diversity tutorial
+
+To work with diversity data you need 3 files:
+
+- OTU table (or any table of counts). The first column will be the OTU name, the next columns will be each of your samples. The data will be the counts of an OTU in each sample
+
+- Taxonomic assigment table (species or function annotation for metagenomes/trascriptomes). The first column will also be the OTU name (this has to match the OTU table) and the columns will be the taxonomic assignmnents
+
+- Metadata table. The first column here should be the name of your samples (the same as in the OTU table) and each column is a variable of interest or your sample (both continuous and categorical)
+
+The metadata table is typically a separate file, but depending on the pipeline you use for the annotation, you may get the OTU table together or separate from your Taxonomic table.
+We will make an example with the OTU and Taxonomic files merged, since this will require an extra step to separate them. 
+
+## 1. LOADING AND PREGARING DATA
+
+Start by loading your data and taking a look at it
+
+### 1.1 OTU table
+
+```{r read file}
+microbial16S <- read.csv("16S_OTU_TAX.csv")
+dim(microbial16S) # 994 rows x 46 columns
+names(microbial16S)
+```
+
+- Column 1: OTU number
+- Columns 2-39: samples
+- Columns 40-45 taxonomic assignments in 7 ranks (Kingdom-Species)
+
+The package vegan works with matrices of numbers, so there cannot be any text columns in the data. Column 1 and 40:45 can't be in our table for the alpha and beta analysis. 
+
+#### 1.1.1 Make the first column the row.names
+
+We don't want to loose the OTU information, so we are going to make the first column the row names and that way it is out of the matrix but we can still identify each row and column.
+
+```{r row names}
+# Read the data again, but specify that the first column is the row names
+microbial16S <- read.csv("16S_OTU_TAX.csv",row.names=1) 
+head(microbial16S)[1:4,1:4]
+```
+
+#### 1.1.2 Split the table
+
+Now we are going to separate the table in two (one with OTUs and one with the taxonomical ranks)
+
+Create a new table with the columns that have the OTU counts by sample (1:37)
+```{r otu table}
+names(microbial16S) # Check which columns to cut
+OTU <- microbial16S[,1:37]
+names(OTU) # Check that we cut correctly
+
+# save the OTU table if you want
+#write.csv(OTU, "16S_OTU.csv",row.names=TRUE) # keep the row names
+```
+
+### 1.2 TAX table 
+
+Create a new table with the columns that have the taxonomic assignments associated to each OTU (38:44)
+```{r tax table}
+TAX <- microbial16S[,38:44]
+names(TAX) # Check that we cut correctly
+head(TAX)  # TAX has the OTU as row.names and 7 taxonomic ranks as columns
+
+# save the TAX table if you want
+#write.csv(TAX, "16S_tax.csv",row.names=TRUE) # keep the row names
+```
+
+### 1.3 metadata table 
+
+Read in the metadata from an external file
+```{r metadata}
+metadata <-  read.csv("16S_metadata.csv",row.names=1) # we make the first row (sample_name), the row.names
+head(metadata) 
+```
+
+### 1.4 Check that the names on all tables match
+
+Check the data to make sure the OTU table, TAX table and metadata files have all the same samples names and OTUs names
+```{r results=FALSE}
+nrow(OTU)==nrow(TAX) # TRUE we have the same number of OTUs in OTU and TAX
+row.names(OTU) == row.names(TAX) # TRUE, and all the names match
+names(OTU) == row.names(metadata) # sample names in OTU table match the sample names in the metadata
+```
+
+## 2. SEQUENCING DEPTH 
+
+### 2.1. Check sequencing depth (number of sequences per sample) 
+```{r sequencing depth}
+# Check the different sequences obtained in each sample
+seqs <- colSums(OTU) # sum all the number in each column (get the number of sequences per sample)
+barplot(seqs,cex.names=0.8,las=2)
+```
+
+### 2.2 Remove samples with less than X reads 
+
+For example, check that they are all over 10000, but this number will depend on your data. It does not make sense to keep samples that are not reliable
+```{r check sequencing depth}
+# check which samples have less than 10000 reads
+colSums(OTU)<10000 # We have a bad sample!
+
+# If we have very low reads sample, we have to remove them. 
+# Identify the columns that have less than the desired number of counts
+which(colSums(OTU)<10000) 
+
+# Delete the sample from the metadata table
+bad <- which(row.names(metadata)==names(which(colSums(OTU)<10000))) # match to the sample name from the OTU table to the sample in the metadata
+metadata <- metadata[-bad,] # delete bad samples and overwrite metadata table
+
+# Delete the columns with low number of reads and overwrite the variable only with the good samples
+OTU <- OTU[,colSums(OTU)>10000]
+dim(OTU) # 994 rows x 36 columns. We lost one sample
+```
+
+### 2.3 Transpose table
+
+Vegan requieres a specific format of the data to calculate the alpha diversity and the distance matrices for beta diversity.
+
+It requiers samples as rows and OTUs as columns. Basically, the opposite than what we have. We can fix this easily by trasnposing the table
+```{r transpose}
+# Transpose table 
+OTUt <- t(sapply(OTU, as.numeric)) # the sapply() here is just to make sure that when we transpose, the data continue in numeric format.
+OTUt[1:4,1:4]
+dim(OTUt) # 36 rows (samples) x 994 columns (OTUs)
+
+# We lost the column names when transposing. We need to get them back
+colnames(OTUt) <- row.names(OTU) 
+```
+
+### 2.4. Rarefy samples to minimum number of reads (Optional)
+
+There are different trends here, to rarefy or not to rarefy...philosophical question for you to investigate.
+```{r rarefy}
+# Find the sample with the minimum number of reads
+minReads <- min(rowSums(OTUt)) 
+minReads
+
+# make the aleatory sampling always the same
+set.seed(1)
+
+# Subsample each sample to the min number of sequences
+OTUt_rarefy<-rrarefy(OTUt, minReads)
+
+# Check that all samples have the same number of reads now
+rowSums(OTUt_rarefy)
+
+# Remove OTUS that now are empty
+OTUt_rarefy_nozero <- OTUt_rarefy[,colSums(OTUt_rarefy)>0]
+
+OTUt_rarefy_nozero[1:4,1:4]
+dim(OTUt_rarefy_nozero)
+
+# You can save the rarefied table for next days
+#write.csv(OTUt_rarefy_nozero,"OTUt_rarefied_nozero.csv",row.names=TRUE)
+```
+
+### 2.5. Rarefaction curve
+```{r rarefaction curve}
+# Check if samples saturate
+# With the transposed table
+rarecurve(OTUt_rarefy_nozero,step=500,sample=minReads,col=brewer.pal(n = 8, name = "Dark2"),lty=c(1:4),label=TRUE)
+```
+
+## 3. ALPHA DIVERSITY
+
+Alpha diversity (How many different species do you have in each of your samples).
+Richness considers the count of species, while evenness considers how the species are ditributed (if they have or not similar relative abundances). The different indexes calculate or consider richness and evenness in different ways.
+```{r alpha diversity}
+# Use the transposed and rarefied table
+alpha <- diversity(OTUt_rarefy_nozero, index="shannon") # other options are "simpson", "invsimposn"
+barplot(alpha, las=2) # Alpha diversity seems to be highest at the Sand samples and lower in the mangroves
+
+# Let's check if it's the case by ordering the samples based on depth
+alphaOrd <- cbind(alpha,metadata) ### Bind alpha values and metadata
+alphaOrd <- alphaOrd[order(alphaOrd$habitat),] ### order according to depth
+barplot(alphaOrd$alpha, las=2, names.arg = row.names(alphaOrd)) 
+
+# We can also use the metadata here to create boxplots according to some categorical variable in our data.
+# We choose to plot the alpha diversity according to habitat
+levels(metadata$habitat) ### Check the order of the levels
+metadata$habitat <- ordered(metadata$habitat,levels=c("Coral","Mangrove","Seagrass","Sand"))### Reorder 
+levels(metadata$habitat) ### Check that the change of order is correct
+boxplot(alpha ~  metadata$habitat) 
+
+# BONUS: Try with other alpha indeces. Do the results look similar?
+alphaS <- diversity(OTUt_rarefy_nozero, index="simpson") #### range 0-1 (no diversity - infinite diversity)
+alphaF <- fisher.alpha(OTUt_rarefy_nozero)
+```
+
+## 4. BETA DIVERSITY
+
+Compare all the samples to one another, how similar or different are the species and their abundances between sites.
+
+The general goal is to plot the distances between samples using different ordination methods (NMDS, PCoA, PCA, CA). Some methods also allow you to fit the environmental variables to your data and find which properties explain better the distribution patterns you see (NMDS, RDA, CCA).
+
+There are many choices to make, since the underlying assumptions and the information that each method provides is different. You can find information on each method here: <https://mb3is.megx.net/gustame>
+
+We will show examples of NMDS and CCA, but keep in mind that there are more oprtions.
+
+### 4.1 Preparing data
+#### 4.1.2 Log transform OTU data
+```{r log tarnsform count data}
+# Use log10(x+1) because we can have 0 values in our count data
+logOTUt_rarefy_nozero <- log10(OTUt_rarefy_nozero + 1)
+```
+
+### 4.1.2 Scale continuous data
+```{r}
+# Normalize environmental data with z-scores
+# z score = (Value - Mean)/SD
+metadata_scale <-as.data.frame(scale(metadata[-1])) # only continuous variables
+metadata_scale_all <- cbind(habitat=metadata$habitat,metadata_scale) # add the habitat column
+```
+
+### 4.1.3 Calculate a distance matrix
+```{r beta diversity}
+# Calculate a distance matrix: default uses Bray Curtis distances, but there are many many more! Check ?vegdist() methods
+# Make sure you are using the transposed table (rows as samples)
+logOTUt_rarefy_nozero_BC <- vegdist(logOTUt_rarefy_nozero, method="bray")
+```
+
+### 4.2. NMDS (Non-metric multidimensional scaling)
+
+#### 4.2.1 NMDS 
+NMDS is based on a distance matrix, but it is calculated inside the function.
+```{r nmds, results= FALSE}
+set.seed(100)
+# The distance matrix is calculated inside the function, so we just provide the raw data
+logOTUt.nmds <- metaMDS(logOTUt_rarefy_nozero, distance="bray")
+#get the stress
+logOTUt.nmds$stress # 0.035
+logOTUt.nmds$points
+```
+
+#### 4.2.2 Plot Base NMDS
+```{r plot NMDS plain}
+# Plot the NMDS 
+plot(logOTUt.nmds) # Circles are the samples (called "sites"), and crosses are the OTUs ("species")
+plot(logOTUt.nmds,display="sites") # Only the sample distribution
+```
+
+#### 4.2.3 Continuous environmebtal variables
+```{r envfit}
+##Check best explanatory variables (No NAs)
+bioenv(logOTUt_rarefy_nozero,metadata_scale)
+
+# Overlay environmental variables on nmds plot
+# Envfit admints categorical variables
+logOTUt.env <- envfit(logOTUt.nmds,metadata_scale_all,permu=999,na.rm=TRUE)
+logOTUt.env
+
+### Get only the continuous ones that are significant (for the ggplot later)
+logOTUt.env.sel <- envfit(logOTUt.nmds,metadata_scale[-2],permu=999,na.rm=TRUE)
+```
+
+#### 4.2.4 Categorical environmental variables
+```{r check significant groups}
+# You will need the package pairwiseAdonis for the comparisons
+#library(devtools)
+#install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+#library(pairwiseAdonis)
+
+# Check signinificant grouping variable with the PERMANOVA test adonis
+# You can supply the distance matrix or it will calculate the Bray-Curtis by default
+adonis(logOTUt_rarefy_nozero  ~ metadata$habitat) ### Check if habitat is a significant grouping variable
+
+# Compare habitats 2 by 2 
+pairwise.adonis(logOTUt_rarefy_nozero,metadata$habitat)
+```
+
+#### 4.2.5 Plot NMDS colored by habitat and with metadata fit
+```{r plot NMDS colors}
+# Make plot nicer, by coloring the samples accoriding to depth habitat
+mds.fig <- ordiplot(logOTUt.nmds, type = "none")
+# plot just the samples, colour by habitat, pch=19 means plot a circle
+points(mds.fig, "sites", pch = 19, col = "darkorchid1", select = metadata$habitat == "Coral")
+points(mds.fig, "sites", pch = 19, col = "yellowgreen", select = metadata$habitat == "Seagrass")
+points(mds.fig, "sites", pch = 19, col = "chocolate4", select = metadata$habitat == "Mangrove")
+points(mds.fig, "sites", pch = 19, col = "orange", select = metadata$habitat == "Sand")
+legend(x=1.3,y=-0.3, col=c("darkorchid1","chocolate4","yellowgreen","orange"),legend=c("Coral","Mangrove","Seagrass","Sand"),pch=19, bty="n")
+
+### Overlay significant environmental variables
+plot(logOTUt.env, col = "gray30",p.max=0.05) ### select the p val of the samples you plot
+
+## add 95% CI ellipse
+ordiellipse(logOTUt.nmds, metadata$habitat, conf = 0.95, label = FALSE,col=c("darkorchid1","chocolate4","yellowgreen","orange"))
+
+```
+
+#### 4.2.6 Plot ggplot NMDS
+```{r plot NMDS ggplot plain}
+autoplot(logOTUt.nmds, layers = "sites") ### Like the basic plot we did in base
+```
+
+##### NMDS with color according to habitat
+```{r plot NMDS gglpot colors and hull}
+# We need to rearrange the data from the OTUt.nmds object
+# str(OTUt.nmds)
+
+# Recover the values form the NMDS output object 
+nmds.p <- as.data.frame(logOTUt.nmds$points)
+# Rover the environmental fit arrows (only the significant ones, check in 4.2.3)
+envFort <- fortify(logOTUt.env.sel)
+
+# Combine the NMDS and metadata in one table
+# Only do this if your samples are in the same order in the NMDS and metadata
+# row.names(logOTUt.nmds$points)==row.names(metadata) #Check!
+nmds.p.m <- cbind(nmds.p,metadata)
+
+# reorder the levels of habitat
+nmds.p.m$habitat <- ordered(nmds.p.m$habitat,levels=c("Coral","Mangrove","Seagrass","Sand"))
+
+# Make a ggplot
+nmds.ggplot <- ggplot(nmds.p.m, aes(x = MDS1, y = MDS2,color= habitat))+
+  geom_point(size = 3)+
+  stat_ellipse(level = 0.95)+
+  #scale_color_manual(values=c("darkorchid1","chocolate4","yellowgreen","orange"))+
+  theme_bw()
+
+# see the plot
+nmds.ggplot
+
+# Make a ggplot with environmental variables overlayed
+nmds.ggplot.env <- ggplot(nmds.p.m)+
+  geom_point(size = 3,
+             aes(x = MDS1, y = MDS2,color= habitat))+
+  stat_ellipse(level = 0.95,aes(x = MDS1, y = MDS2,color= habitat))+
+  scale_color_manual(values=c("darkorchid1","chocolate4","yellowgreen","orange"))+
+  geom_segment(data=envFort,aes(x=0,xend=NMDS1,y=0,yend=NMDS2),arrow=arrow(length=unit(0.2,"cm")),col=colors()[290])+
+  geom_text(data=envFort,aes(x=NMDS1,y=NMDS2,label=Label),nudge_x=0.1,nudge_y=0.1,color=colors()[290])+
+  theme_bw()
+
+# see the plot
+nmds.ggplot.env
+
+```
+
+### 4.3 CCA (Constrained Canonical correspondence analysis). 
+
+Constrained means that we use the environmental properties to explain (constrain) the variancce in the dataset.
+
+CCA uses Chi-squared distances and is appropriate for count data.
+
+We need the OTUt table (not the distance matrix) and the metadata without NAs.
+
+### 4.3.1 NA values in the metadata
+What to do if we have NAs? We have two options: we remove the variables that have NAs or we try to fill in the values (given that the variation in the data is not too big) and that we don'y have many NAs. We can try and fill with mean or interpolate if the variable has a predictable distribution.
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Check if the rows have all the data
+complete.cases(metadata_scale) # row 8 has missing value
+is.na(metadata_scale[8,]) # St02_SD in the DOCuM column
+
+# fill NA with mean value
+plot(metadata_scale$DOCuM ~ metadata$habitat) # Look at the variance of the variable in each habitat. Sand (SD) habitat has low variance, safe to fill with mean
+mean(metadata_scale[metadata$habitat=="Sand",]$DOCuM,na.rm=TRUE) # MEAN = -1.57
+sd(metadata_scale[metadata$habitat=="Sand",]$DOCuM,na.rm=TRUE) # SD = 0.21
+metadata_scale[which(is.na(metadata_scale$DOCuM)==TRUE),]$DOCuM <- mean(metadata_scale[metadata$habitat=="Sand",]$DOCuM,na.rm=TRUE) # replace NA with mean value
+
+complete.cases(metadata_scale) # all complete now
+```
+
+#### 4.3.2 Model comparison
+
+We are going to do an automated process to determine which variables contribute to the data distribution.
+
+We will start calculating a null model (distribution without any environmental variables)
+
+Then we will calculate a full model (with all the environmental variables)
+
+Then we will go from the null model to the full model by adding an environmental variable in each step. We will keep the model that has that explains the highest variance with the minimum number of significant variables.
+
+
+##### - Null model. No constraints
+```{r CCA model}
+# No constraints: CCA (No environmental variables)
+mod0 <- cca(logOTUt_rarefy_nozero ~ 1, metadata_scale, na.action = "na.omit") 
+mod0 # Check the variance. All the Variance (Inertia) is Unconstrained
+anova(mod0) # There is no model, all the variance is residual variance
+plot(mod0) # base plot
+autoplot(mod0, layers = c("sites", "biplot")) # ggplot
+```
+
+##### - Full model (with all variables)
+```{r full model}
+# All environmental variables: Full model
+mod1 <- cca(logOTUt_rarefy_nozero ~ ., metadata_scale, na.action = "na.omit")
+mod1 # The variance (Inertia) explained by the environmental variables is 73% (Constrained Proportion)
+anova(mod1) # The model is significant, although there is still 27% variance that remains unexplained
+autoplot(mod1, layers = c("sites", "biplot"))
+```
+
+##### - Stepwise model
+
+It will check one by one each of the variables, see if they improve the null model, and return the best model. 
+It starts from no variables (Model 0) until you reach all the variables included (Model 1). There are two main reasons to do that :
+
+* Search for parsimony: find the model with the minimum number of variables but the highest explanatory power
+* Reduce the correlations amongst the variables
+
+```{r setwise model, results=FALSE}
+vif.cca(mod1)
+
+# Option1: Automatic selection of variables based on P-values
+mod.p <- ordistep(mod0, scope=formula(mod1),direction = "both", steps = 1000)
+# Option2: Automatic selection of variables based on R2-squared
+mod.r <- ordiR2step(mod0, scope=formula(mod1),direction = "both", steps = 1000)
+
+vif.cca(mod.p) ### pH gone
+vif.cca(mod.r) ### pH gone
+```
+
+```{r final model output}
+mod.p
+anova(mod.p) # The model explains 61% of the variance in the data
+autoplot(mod.p, layers = c("sites", "biplot")) # see the significant variables
+```
+
+##### - Plot the Model with color and shape according to different variables
+```{r CCA plot environ}
+smy <- summary(mod.p) # Access the data inside the object mod.p
+df1 <- as.data.frame(smy$sites[,1:2]) # get the coordinates of the samples on the first 2 axes of the CCA
+df2 <- data.frame(smy$biplot[,1:2])   # get the coordinates of the environmental variables 
+
+p <- ggplot(df1, aes(x = CCA1, y = CCA2))+
+  geom_point(size = 3,aes(color= metadata$DOCuM, shape = metadata$habitat))+
+  geom_segment(data = df2, aes(x=0, y = 0, xend = CCA1, yend= CCA2), arrow = arrow(length = unit(0.02, "npc")))+
+  geom_text(data = df2, aes(x = CCA1, y = CCA2, label = rownames(df2))) +
+  scale_color_gradient(low='blue',high='red') +
+  labs(color=expression(paste("DOC ",mu,"mol ",L^-1)),shape="Habitat")+
+  theme_bw()
+p
+```
+
+## 5. RELATIVE ABUNDANCE
+
+Now we need the OTU table (not transposed), the metadata and the Taxonomic assignment
+
+### 5.1 Convert counts to relative abundance
+```{r relativea abundance}
+sums <- rowSums(OTUt_rarefy_nozero) # transposed and rarefied table (you could use the non rarefied)
+relABt <- sweep(OTUt_rarefy_nozero, MARGIN=1,sums ,"/") # divide number of OTU reads by the total in each sample
+relABt <- relABt*100
+rowSums(relABt) # check all columns have 100% 
+dim(relABt)
+class(relABt)
+```
+
+### 5.2 Transpose the table back
+```{r rel ab transposed}
+relAB <- t(relABt)
+relAB[1:4,1:4]
+names(relAB) <- row.names(relABt)
+row.names(relAB) <- names(relABt)
+
+#write.csv(relAB,"relAb_rarefy.csv",row.names=TRUE)
+```
+
+### 5.3 Merge tables (relAb + metadata +TAX)
+```{r merging}
+# Merge OTU relAB table and TAX
+dim(relAB)
+dim(TAX)
+rAbTAX <- cbind(relAB,TAX)
+rAbTAX$OTU <- row.names(rAbTAX)## create column from the row names to merge with metadata
+
+# Covert to long format
+long.rAbTAX <- melt(rAbTAX,id=c("OTU","Kingdom","Phylum","Class","Order","Family","Genus","Species"))
+head(long.rAbTAX)
+
+# Rename value and variable
+names(long.rAbTAX)[9] <- "station" #variable
+names(long.rAbTAX)[10] <- "relAb"   #value
+
+# Add metadata
+metadata$Label <- row.names(metadata) ### create a temporary column from the row.names
+long.all <- merge(x=long.rAbTAX,y=metadata,by.x="station",by.y="Label")
+head(long.all)
+```
+### 5.4. Barplot of All Abundance Phyla
+```{r}
+ggplot(data=long.all, aes(x=station,y=relAb, fill=Phylum))+
+    geom_bar(stat="identity",position="stack")+
+    guides(fill=guide_legend(title="Phylum"),colour=FALSE)+
+    ylab(label= "relative abundance percent")+
+    scale_fill_manual(values = colorRampPalette(brewer.pal(9,"Paired"))(length(unique(long.all$Phylum))))+
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)
+  )
+```
+
+### 5.5 Get relative abundances of top 10 Phyla
+```{r top 10}
+long.all$relAb <- as.numeric(long.all$relAb) # make numeric the "relAb" column
+long.all <- long.all[-as.numeric(row.names(long.all[long.all$relAb==0,])),] # delete the 0 values because they modify the mean
+
+# get the top 10 most abundant Phyla
+sumPhyla <- tapply(long.all$relAb, list(long.all$Phylum,long.all$station),sum,na.rm=TRUE)  ### sum over each sample the relative abundance of the Phyla
+msumPhyla <- rowMeans(sumPhyla,na.rm=TRUE) ### mean of each Phylum in all samples
+top10 <- names(msumPhyla[order(msumPhyla,decreasing=TRUE)[1:10]]) ### get the names of the top 10 Phyla  
+
+#New column with the Phyla by name, if not in the top 10, substitute by "Other""
+long.all$newPhyla <- ifelse(long.all$Phylum %in% top10,as.character(long.all$Phylum),"Other")
+```
+
+###5.6 Barplot of top 10 phyla 
+```{r rel ab by station}
+ggplot(data=long.all, aes(x=station,y=relAb, fill=newPhyla))+
+    geom_bar(stat="identity",position="stack")+
+    guides(fill=guide_legend(title="top 10 Phyla"),colour=FALSE)+
+    ylab(label= "relative abundance percent")+
+    scale_fill_brewer(palette = 'Paired') +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)
+  )
+```
+
+
+###5.7 Barplot of top 10 phyla ordered by habitat
+```{r rel ab by habitat}
+# get the habitat level in order 
+long.all$habitat <- ordered(long.all$habitat,levels=c("Coral","Mangrove","Seagrass","Sand"))
+# get the station level in order
+long.all$station <- factor(long.all$station, levels=unique(long.all$station[order(long.all$habitat)]), ordered=TRUE) 
+ggplot(data=long.all, aes(x=station,y=relAb, fill=newPhyla))+
+    geom_bar(stat="identity",position="stack")+
+    guides(fill=guide_legend(title="top 10 Phyla"),colour=FALSE)+
+    ylab(label= "relative abundance percent")+
+    scale_fill_brewer(palette = 'Paired') +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)
+  )
+```
+
+
