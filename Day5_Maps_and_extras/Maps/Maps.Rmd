@@ -1,0 +1,165 @@
+---
+title: "Maps with marmap"
+author: "Tamara Huete_Stauffer: tamara.huete@gmail.com "
+date: "2/12/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,root.dir="~/R_Course_2019/Day5/Maps/")
+library(marmap)
+library(RColorBrewer)
+```
+
+## Creating maps in R
+
+There are many ways of creating maps in R, but they all follow the same principle. First you download a map using a special package and then you overlay the latitude and longitude coordinates of your stations on top of it. We normally work with sections of maps that cover our sampling area.
+
+###1. Read the file with your stations and take a look at the latitude and longitude ranges
+```{r}
+stations <- read.csv("Map_stations.csv")
+head(stations) ### see what the file looks like, we have 4 columns, we are interested in the latitude and longitude columns for now.
+range(stations$lat) ### look at the ranges of the latitude data : 16-28
+range(stations$long)### look at the ranges of the longitude data : 34-42
+```
+
+Now we know the ranges of latitude and longitude we need for our map to have all the stations included (Latitude 16-28 and Longitude 34-42). We will make these limits a little bigger to get the whole Red Sea inside our map.
+
+###2. Download the map.
+You can set the square according to your study area and you can decide the resolution
+```{r}
+## This is a super high resolution map
+PNG_Map_highres <- getNOAA.bathy(lon1 = 28, lon2 = 46, lat1 =5, lat2 = 35, resolution = 1) ### 1 minute grid. Take a little to download
+
+## This is a low resolution map
+PNG_Map_lowres <- getNOAA.bathy(lon1 = 28, lon2 = 46, lat1 =5, lat2 = 35, resolution = 10) ### 20 minute grid. Takes less to download
+```
+
+###3. Plot the map
+```{r}
+par(mar=c(4,6,4,7.2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(32,45), ylim=c(8,30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-1000, shallow=-1000, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -1000 isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+```
+
+###4. Look at the difference with a low resolution map
+```{r}
+plot(PNG_Map_lowres, image = TRUE, land = TRUE, xlim=c(32,45), ylim=c(8,30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_lowres), gray(.3)), c(min(PNG_Map_lowres),0 , "white")),las=1)
+plot(PNG_Map_lowres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+```
+
+###5. Add the sations as points to the plot.
+```{r}
+par(mar=c(4,6,4,7.2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(32,45), ylim=c(8,30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-1000, shallow=-1000, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -1000 isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+points(stations$long,stations$lat, bg='red', cex = 1, pch=21, col="darkgray")
+```
+
+###6. Color the points according to some categorical variable (for example: season)
+```{r}
+### the variable has to be a factor
+class(stations$season) 
+## If it says "character" do:
+#stations$season <- as.factor(stations$season)
+levels(stations$season) ## the seasons are mixed up, we need to reorder them
+stations$season <- factor(stations$season,levels=c("Winter","Spring","Summer","Fall"))
+levels(stations$season) ### the order is ok now (Winter, Spring, Summer, Fall)
+## choose colors for the seasons
+colseason <- c("deepskyblue3","yellowgreen","brown3","darkorange")
+
+ ### Plot the map with the sations colored and add legend
+par(mar=c(4,6,4,7.2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(32,45), ylim=c(8,30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-1000, shallow=-1000, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -1000 isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+points(stations$long,stations$lat, bg=colseason[stations$season], cex = 1, pch=21, col="darkgray")
+legend(x=40, y=30, legend=c("Winter","Spring","Summer","Fall"), pt.bg=c("deepskyblue3","yellowgreen","brown3","darkorange"),col="darkgray",pch=21, cex=0.5, bty="n", text.col="white")
+```
+
+###7. Save the map to a pdf file. This may take a couple of attempts, since what you see on th R studio screen is not the same as the output
+```{r}
+pdf("Map_seasons.pdf", width=7, height=8)
+par(mar=c(4,6,4,7.2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(32,45), ylim=c(8,30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-1000, shallow=-1000, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -1000 isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+points(stations$long,stations$lat, bg=colseason[stations$season], cex = 1, pch=21, col="darkgray")
+legend(x=41, y=29, legend=c("Winter","Spring","Summer","Fall"), pt.bg=c("deepskyblue3","yellowgreen","brown3","darkorange"),col="darkgray",pch=21, cex=0.8, bty="n", text.col="white")
+dev.off()
+```
+
+###8. BONUS: Color the stations according to a contonuous variable (temperature)
+```{r}
+#### check the ranges of temperature 
+range(stations$SST) ### 27.5 - 33
+
+#### Make a palette function with the colors you choose (RColor Brewer)
+rbPal <- colorRampPalette(c("blue","firebrick1"))
+### You can also use built in palettes:
+#rbPal <- colorRampPalette(brewer.pal(9,"Spectral"))
+
+### Make a new colum in your dataset that has the values of the colors
+length(seq(27,33,by=1)) ### see how many breaks you need according to the cuts you decide to make. In this case, we need 7
+stations$Col <- rbPal(7)[as.numeric(cut(stations$SST,breaks = seq(27,33,by=1),include.lowest=TRUE))]
+
+### Change the layout because now we need room for the legend
+layout(matrix(1:2,ncol=2), width = c(3,0.8),height = c(1,1))
+
+### First plot map
+par(mar=c(4,4,2,2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(30,45), ylim=c(8, 30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+points(stations$long, stations$lat, bg=stations$Col, cex = 1.2, pch=21, col="darkgray")
+
+### Then plot continuos legend
+par(mar=c(6,1,6,2))
+legend_image <- grDevices::as.raster(matrix(rbPal(7), ncol=1))
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = expression(paste("Temp ", degree*C)))
+text(x=1.2, y = seq(0,1,l=7), labels = rev(c("27","28","29","30","31","32","33")))
+rasterImage(legend_image, -2, 0, 0.5,1)
+```
+
+In order to save the map, just add pdf("name_of_plot.pdf") before you start the plot, and dev.off() when you finish.
+```{r}
+####save as pdf
+pdf("Map_temperature_continuous_scale.pdf", width=7,height=9)
+
+### Change the layout because now we need room for the legend
+layout(matrix(1:2,ncol=2), width = c(3,0.8),height = c(1,1))
+
+### First plot map
+par(mar=c(4,4,2,2))
+plot(PNG_Map_highres, image = TRUE, land = TRUE, xlim=c(30,45), ylim=c(8, 30), n=5, lwd = 0.01, bpal = list(c(0, max(PNG_Map_highres), gray(.3)), c(min(PNG_Map_highres),0 , "white")),las=1)
+plot(PNG_Map_highres, deep=0, shallow=0, lwd = 0.6, add=T,col="gray")  # Add coastline
+plot(PNG_Map_highres, deep=-200, shallow=-200, lwd = 0.4, drawlabels=T, add=T,col="gray")  # Add -200m isobath
+plot(PNG_Map_highres, deep=-2000, shallow=-2000, lwd = 0.4, drawlabels=T, add=T, col="gray")  # Add -2000m isobath
+points(stations$long, stations$lat, bg=stations$Col, cex = 1.2, pch=21, col="darkgray")
+
+### Then plot continuos legend
+par(mar=c(6,1,6,2))
+legend_image <- grDevices::as.raster(matrix(rbPal(7), ncol=1))
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = expression(paste("Temp ", degree*C)))
+text(x=1.2, y = seq(0,1,l=7), labels = rev(c("27","28","29","30","31","32","33")))
+rasterImage(legend_image, -2, 0, 0.5,1)
+
+####Close image
+dev.off()
+
+```
+
+
