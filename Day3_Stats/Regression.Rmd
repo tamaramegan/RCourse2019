@@ -1,0 +1,122 @@
+---
+title: "Regression Analysis"
+author: "Daffne/Malika/Greg"
+date: "5/16/2019"
+output: html_document
+---
+```{r}
+rm(list=ls())  #Remove all the objects from your environment
+graphics.off() #Clear all plots
+
+########################################################################
+########                                                       #########
+########                  1. PACKAGES                          #########
+########                                                       #########
+########################################################################
+
+library(graphics)
+library(ggplot2)
+
+#need Hmisc-- install.packages("Hmisc")
+library(Hmisc) #load the package
+
+#need corroplot --install.packages("corrplot")
+library(corrplot)
+
+###########################################
+```
+```{r}
+########################################################################
+########                                                       #########
+########           2. READ AND PREPARE DATA                    #########
+########                                                       #########
+########################################################################
+
+setwd("/Users/lopezsdc/Dropbox/Postdoc_KAUST/Cursos/Stats_R/day3")
+getwd()
+
+Reg1 <- read.csv("Regression.csv", sep=";") # attribute an object(name) to a data frame
+
+head(Reg1) # display the first 6 observations
+```
+```{r}
+########################################################################
+########                                                       #########
+########      3. Visually Explore your data                    #########
+########                                                       #########
+########################################################################
+### Using regression for prediction: We aim to predict the lenght of our species 
+### by the amount of food
+
+#Explore your data with a scatter plot 
+
+plot(Reg1$mg_food, Reg1$Lenght_cm, main="Scatterplot", 
+     xlab="Food (mg)", ylab="Lenght", pch=19,cex=0.6) # line (x,y)
+
+
+```
+```{r}
+########################################################################
+########                                                       #########
+########               4. Linear Model                         #########
+########                                                       #########
+########################################################################
+
+# Define your x and y (this is optional)
+#x<-(Reg1$mg_food)
+#y<-(Reg1$Lenght_cm)
+
+#Build linear regression model on full data
+
+#Lmodel1 <- lm(y ~ x , data=Reg1)  
+
+LinMod1 <- lm(Reg1$Lenght_cm ~ Reg1$mg_food)# same result than before. 
+print(LinMod1)
+summary(LinMod1)
+
+#################### Go to the power point to explore the results##############
+
+### Check if our data do follow the assumptions to build a good model
+
+##### A quick way to explore assumptions is to do it visually 
+#So let's plot our model see details in the presentation
+
+plot(LinMod1)
+#if you see a warning about margins, increase the size of the window
+
+#### Now we can do test for normality and homocedasticity 
+
+# Normality of residuals
+library(MASS)
+sresid <- studres(LinMod1) 
+hist(sresid, freq=FALSE, 
+     main="Distribution of Studentized Residuals") #Studentized Res=Residuals/SD
+shapiro.test(sresid) # test of residual normality: 
+#p=0.64 significant result, we do not have enough evidece
+#to reject the null hypothesis (Ho; mu=normal)
+
+library(car)
+# Homogeneity of variance
+ncvTest(LinMod1) # non-constant variance test
+#p=<0.05 we fail to reject the null hypothesis (Ho; equal variances)
+```
+
+```{r}
+############# Once you check the assumptions continue with the analysis
+
+plot(Reg1$mg_food, Reg1$Lenght_cm, main="Scatterplot", 
+     xlab="Food (mg)", ylab="Lenght (cm)", pch=19,cex=0.6) # line (x,y)
+abline(LinMod1, col="blue", lty=2)
+
+####### Predictions#######
+
+#Now, predicting the changes in  Lenght by evaluating 
+#the fitted line at the food added per day
+
+pred1 <- c(0.2, 3, 10)
+
+# same as y=a+bx
+
+coef(LinMod1)[1] + coef(LinMod1)[2] * pred1
+
+```

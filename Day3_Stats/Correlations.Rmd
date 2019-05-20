@@ -1,0 +1,123 @@
+---
+title: "Correlations"
+author: "Daffne/Malika/Greg"
+date: "5/16/2019"
+output: html_document
+---
+
+```{r}
+# 1. Clear your working space
+rm(list=ls())  #Remove all the objects from your environment
+graphics.off() #Clear all plots
+```
+```{r}
+# load libraries
+library(graphics)
+library(ggplot2)
+#install.packages("Hmisc")
+library(Hmisc) #load the package
+#install.packages("corrplot")
+library(corrplot)
+```
+```{r}
+## 2. Set working directory and read your data
+setwd("/Users/lopezsdc/Dropbox/Postdoc_KAUST/Cursos/Stats_R/day3")
+getwd()
+
+Corr1 <- read.csv("correlations.csv", sep=";") 
+
+head(Corr1) # display the first 6 observations
+```
+```{r}
+########################################################################
+########                                                       #########
+########      3. Visually Explore possible relation            #########
+########                                                       #########
+########################################################################
+
+# scatterplot to visualize any possible relation between the dependent (response) variable
+# and the independent (explanatory) variable
+
+scatter.smooth(x=Corr1$chl_ugL, y=Corr1$production_mgCm2d)  # scatterplot
+
+```
+```{r}
+########################################################################
+########                                                       #########
+########               4. Correlation                          #########
+########                                                       #########
+########################################################################
+# Define your response and explanatory variables as x and y 
+
+x<- (Corr1$chl_ugL) #explanatory
+y<-(Corr1$production_mgCm2d) # response
+
+#Test the Correlation. Ho: rho= 0 (no correlation) Ha: rho>0
+
+cor.test(x, y, alternative =  c("two.sided", "less", "greater")) # Pearson's coefficient 0.99
+
+
+```
+
+```{r}
+########################################################################
+########                                                       #########
+########               5. Correlation Matrix                   #########
+########                                                       #########
+########################################################################
+
+### Subset our data,only focussed on the 4th first columns
+
+my_var<-Corr1[,1:4] 
+head(my_var) # display the first 6 observations
+
+######## find the pearson coeff among all variables ####################
+
+all_correl <- cor(my_var) # 
+all_correl
+
+round(all_correl, 2) #  round correlation coefficient with 2 digits
+
+##############################################################
+# TIP: If your data contain missing values, use: 
+#####res<- cor(my_data, use = "pairwise.complete.obs")
+##############################################################
+
+######## find the p-values from your correlations
+
+#need ("Hmisc")   
+library(Hmisc) #load the package
+
+# Need to use the data as a matrix for this function
+
+my_var2 <- rcorr(as.matrix(my_var)) #Remember my_var was the matrix with my subset of data. 
+my_var2
+
+# Extract the correlation coefficients
+my_var2$r
+# Extract p-values
+my_var2$P
+
+```
+```{r}
+########################################################################
+########                                                       #########
+########          6. VISUALIZE THE CORRELATION MATRIX          #########
+########                                                       #########
+##############################################################################################################Visualize correlation matrix#####################
+graphics.off() #Clear all plots
+
+library(corrplot)
+
+corrplot(all_correl, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+
+# Positive correlations in blue and negative correlations in red color. 
+# Color intensity and the size of the circle are proportional to the correlation coefficients. 
+
+#"hclust" reorders the matrix by hierachical clustering.
+# tl.col (for text label color) and tl.srt (for text label string rotation) 
+
+
+
+```
+

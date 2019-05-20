@@ -1,0 +1,159 @@
+---
+title: "Comparing two means (t-test)"
+author: "Daffne/Tamara"
+date: "5/16/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls()) # Clear environment 
+graphics.off() #Clear all plots
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+### Read packages into R #####
+###
+library(car)
+library(ggpubr)
+library(ggplot2)
+
+#install.packages("ggpubr")
+library(ggpubr)
+```
+
+```{r}
+### Read and prepare your data
+### Set the path to your working folder:
+
+setwd("~/Dropbox/Postdoc_KAUST/Cursos/Stats_R/Day3_final")
+getwd()
+
+gr <- read.csv("t_testdata.csv", sep=";")
+```
+
+```{r}
+### Look ta data structure
+
+# In our table we have bacterial growth rates from two different experiments (GrowthRate and GrowthRate2)
+# we want to see if there is a difference between both set of samples
+
+########################################################################
+########                                                       #########
+########               1. CHECK ASSUMPTIONS                    #########
+########                                                       #########
+########################################################################
+
+
+###Normality
+### The null hypothesis is that the data follows a normal distribution Ho=normal
+
+hist(gr$GrowthRate)
+qqnorm(gr$GrowthRate)
+shapiro.test(gr$GrowthRate) 
+
+##### p=0.27 not significant
+##### This means that there is week evidence against the Ho, so we fail to reject it.
+##### Meaning that the distribution of the data does not deviate from a normal distribution
+
+```
+
+```{r}
+########################################################################
+########                                                       #########
+########               2. STUDENT T-TEST                      #########
+########                                                       #########
+########################################################################
+#https://www.statmethods.net/stats/ttest.html
+
+##### Explore your data
+
+
+P1<-ggboxplot(gr, x = "Day", y = "GrowthRate", 
+              color = "Day", palette = c("#00AFBB", "#E7B800"),
+          ylab = "Bacterial growth", xlab = "Day")
+
+P1
+
+# Measurements of bacterial growth rates from two different experiments (Day 1 and Day2)
+
+t.test(gr$GrowthRate,gr$Day, mu=0) 
+
+
+#p<0.05 therefore we have enough evidence to reject Ho (mu1 -mu2 different 0)
+
+```
+```{r}
+##################################################################################
+#  Exercise 1                                                  
+#  Determine if bacterial growth rates changed as a result of the temperature treatment :inSitu and warm 
+
+## 1 Factor (growth rates) with 2 levels (two temperature treatments). Be careful cause Temp_Treat = 3Levels
+## Ho: mu1-mu2=0
+
+## SOME HELP: You need to subset your data with the values from Temp_treat you need
+#### Use %in% to match (conect) the factor and concatenate treatments("","")
+
+grInSituW <- gr[gr$Temp_Treat %in% c("InSitu","Warm"),]
+
+######## Explore your data
+
+ggboxplot(grInSituW, x = "Temp_Treat", y = "GrowthRate", 
+          color = "Temp_Treat", palette = c("#00AFBB", "#E7B800"),
+          ylab = "Bacterial growth", xlab = "Treatment")
+
+######## Now do the test
+t.test(grInSituW$GrowthRate ~ grInSituW$Temp_Treat) 
+
+##  p=0.06
+##  We don't have enough evidence to reject the null hypothesis, so we fail to reject Ho
+
+#t.test(y1,y2)### Options for numerical explanatory variable
+#t.test(y1,y2,paired=TRUE) ### And for paired t-test
+
+#### DETAILS OF THE ANALYSIS AT THE PRESENTATION
+```
+
+```{r}
+# If our data does not follow a normal distribution
+########     3. Non-parametric Test (Wilcoxon-Mann-Whitney)    ########
+
+# Now lets determine the effect of temperature over bacterial growth rates
+# from a thrid experiment: data of column GrowthRate_NP 
+
+#First normality test
+
+hist(gr$GrowthRate_NP)
+qqnorm(gr$GrowthRate_NP)
+shapiro.test(gr$GrowthRate_NP)  
+
+#P<0.05 The result is signficant, therefore we have evidence to reject Ho (Ho=normal)
+#Meaning that the distribution of the data deviate from a normal distribution
+
+```
+```{r}
+#######       U-test (Mann-Whitney):  1 Factor with 2 levels ############
+#######       (temperature: Cold and Warm)                   ############
+
+## Null hypothesis is that the means of both treatments are equal
+
+grCW <- gr[gr$Temp_Treat %in% c("Cold","Warm"),]
+
+wilcox.test(GrowthRate_NP ~ Temp_Treat, data = grCW,
+            exact = FALSE)  # exact 
+
+ggboxplot(grCW, x = "Temp_Treat", y = "GrowthRate_NP", 
+          color = "Temp_Treat", palette = c("#00AFBB", "#E7B800"),
+          ylab = "Bacterial growth", xlab = "Treatment")
+
+####### p<0.05: there is strong evidence against the Ho, so we reject the null hypothesis
+
+
+
+```
+```

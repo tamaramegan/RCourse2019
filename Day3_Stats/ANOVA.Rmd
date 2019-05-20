@@ -1,0 +1,162 @@
+---
+title: "ANOVA"
+author: "Daffne/Tamara"
+date: "5/16/2019"
+output: html_document
+---
+
+```{r}
+rm(list=ls()) # Clear environment 
+graphics.off() #Clear all plots
+```
+
+```{r}
+###  1. Read or insstall packages into R #####
+###
+        library(car)
+        library(ggpubr)
+        library(ggplot2)
+
+#install.packages("FSA")
+        library(FSA)
+```
+```{r}
+#### 2. Set the path to your working folder:
+
+setwd("/Users/lopezsdc/Dropbox/Postdoc_KAUST/Cursos/Stats_R/day3")
+gr <- read.csv("ANOVA_data.csv")
+
+### Look ta data structure
+head(gr)
+names(gr)
+gr
+gr$GrowthRate
+```
+```{r}
+### 3. Check type of variables (For ANOVA, categorical variables have to be factor)
+ 
+
+class(gr$Temp_Treat)
+#gr$Temp_Treat <- factor(gr$Temp_Treat,levels=c("Cold","InSitu","Warm"))
+
+class(gr$Nutrient)
+#gr$Nutrient <- factor(gr$Nutrient,levels=c("Control","Org","In","InOrg"))
+
+#########
+```
+```{r}
+########  4. CHECK ASSUMPTIONS                   
+
+### Normality
+
+### The null hypothesis is that the data follows a normal distribution 
+### If the p > 0.05, then we can assume the distribution of the data does not deviate from a normal distribution
+
+hist(gr$GrowthRate)
+qqnorm(gr$GrowthRate)
+shapiro.test(gr$GrowthRate) #pval = 0.29, we don't have enough evidence to reject Ho (Ho=normal)
+
+
+### Homoscedasticity (same variance)
+### The null hypothesis is that the data has the same variance. 
+### If the p > 0.05, then we can assume the variance is similar in the different treatments
+### For the temperature treatment
+
+leveneTest(gr$GrowthRate~gr$Temp_Treat) #pval = 0.75 
+plot(gr$GrowthRate ~ gr$Temp_Treat)
+tapply(gr$GrowthRate,list(gr$Temp_Treat),var) ### Get the variance for each group
+
+
+```
+```{r}
+
+########                 5. ONE-WAY ANOVA                     #########
+########                                                      #########
+
+#http://www.sthda.com/english/wiki/one-way-anova-test-in-r
+
+### ONE-WAY ANOVA: The effect of temperature
+#### Check differences between different levels of 1 treatment.
+
+### aov(y~x)
+
+anova1 <- aov(gr$GrowthRate ~ gr$Temp_Treat) ### 
+summary(anova1) #signif effect of Temperature (p < 0.05), reject Ho, at least one of the means is different
+
+# WHich one?  a posterior test
+TukeyHSD(anova1) ### Post hoc analysis. Difference in mean values of each treatment
+#InSitu-Cold p<0.05
+#Warm-Cold p< 0.05
+# Warm-Insitu p =0.45
+
+plot(TukeyHSD(anova1)) ### In plot, if the difference crosses the line (includes 0), there is no signif difference
+```
+
+```{r}
+##########################################################################
+#####                       Exercise 1 (YOUR TURN)                #########
+##### Determine the effect of nutrient addition over growth rates #########
+
+##########################################################################
+
+### ONE-WAY ANOVA: Test the effect of nutrients over growth rates on the first experiment
+### GrowthRate column
+
+##### GO TO POWER POINT FOR A DEEPER EXPLANATION OF THE RESULTS TABLE
+
+plot(gr$GrowthRate ~ gr$Nutrient)
+
+anova2 <- aov(gr$GrowthRate ~ gr$Nutrient) 
+summary(anova2)
+
+TukeyHSD(anova2)
+plot(TukeyHSD(anova2))
+```
+```{r}
+####### WHAT IF MY DATA FAIL THE ASSUMPTIONS?  ####### 
+
+########               6. KRUSKAL-WALLIS TEST 
+########              Non-parametric comparison                #########
+
+#http://www.sthda.com/english/wiki/kruskal-wallis-test-in-r
+
+#### If data do not meet the assumptions of Normality/Homoscedasticity
+#### You can try to normalize the data by transforming:
+?log()   ## Natural logarithm
+?log10() ## Base 10 log
+?sqrt()  ## square-root transfromation
+### After trasformation, check again the normality and homocedasticity assumptions
+
+#### Or you can use Non-parametric tests:
+
+##Normality
+hist(gr$GrowthRate_NP)
+qqnorm(gr$GrowthRate_NP)
+shapiro.test(sqrt(gr$GrowthRate_NP)) #pval 0.044, WE REJECT Ho (Ho=normal)
+
+## Homoscedasticity
+leveneTest(gr$GrowthRate_NP~gr$Temp_Treat) #pval = 0.005
+plot(gr$GrowthRate_NP~ gr$Temp_Treat)
+
+leveneTest(gr$GrowthRate~gr$Nutrient) #pval = 0.96
+plot(gr$GrowthRate ~ gr$Nutrient)
+
+
+##Kruskall-Wallis test for temperature (Heterocedastic)
+
+boxplot(gr$GrowthRate_NP~ gr$Temp_Treat)
+
+kruskal1 <- kruskal.test(gr$GrowthRate_NP~ gr$Temp_Treat)
+kruskal1 ## p=0.015, we reject our Ho (Ho; mu1=mu2=mu3) 
+
+# A post-hoc - Dunn test for multiple comparisons
+# need FSA pack so if you forgot at the beggining: library(FSA)
+
+dunnTest(gr$GrowthRate_NP,gr$Temp_Treat,method="bonferroni",two.sided = TRUE)
+
+#If the Kruskal–Wallis test is significant, a post-hoc analysis can be performed to determine which levels of the independent variable differ from each other level.  
+#Probably the most popular test for this is the Dunn test, which is performed with the dunnTest function in the FSA package.  Adjustments to the p-values could be made using the method option to control the familywise error rate or to control the false discovery rate.  See ?p.adjust for details.
+#Zar (2010) states that the Dunn test is appropriate for groups with unequal numbers of observations.
+### You can change the method of the p value correction
+```
+

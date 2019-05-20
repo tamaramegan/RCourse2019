@@ -1,0 +1,225 @@
+---
+title: "two-way ANOVA"
+author: "Daffne/Tamara"
+date: "5/16/2019"
+output: html_document
+---
+```{r}
+rm(list=ls()) # Clear environment 
+graphics.off() #Clear all plots
+```
+
+```{r}
+###  1. Read or insstall packages into R #####
+###
+        library(car)
+        library(ggpubr)
+        library(ggplot2)
+        library(FSA)
+```
+```{r}
+#### 2. Set the path to your working folder:
+
+setwd("/Users/lopezsdc/Dropbox/Postdoc_KAUST/Cursos/Stats_R/day3")
+gr <- read.csv("ANOVA_data.csv")
+
+### Look ta data structure
+head(gr)
+names(gr)
+gr
+gr$GrowthRate
+```
+```{r}
+########                                                       #########
+########               3. TWO-WAY ANOVA                        #########
+#
+#http://www.sthda.com/english/wiki/two-way-anova-test-in-r
+
+#### Check differences between different levels of 2 treatments.
+
+### TWO-WAY ANOVA WITH INTERACTION: TEMPERATURE *  NUTRIENT
+### check for the interaction first!!!!
+anova3 <- aov(gr$GrowthRate ~ gr$Temp_Treat*gr$Nutrient) ### 
+summary(anova3) # gr$Temp_Treat:gr$Nutrient p=0.653 the interaction is not signicant
+
+### if no interaction, remove term from anova
+
+### TWO-WAY ANOVA WITHOUT INTERACTION: TEMPERATURE +  NUTRIENT
+anova4 <- aov(GrowthRate ~ Temp_Treat+Nutrient, data =gr)### Signif Temp and Nutrient
+summary(anova4)
+TukeyHSD(anova4)
+
+plot(TukeyHSD(anova4,"Temp_Treat"))
+plot(TukeyHSD(anova4,"Nutrient"))
+
+```
+```{r}
+#### Plot the effect of Temperature on Growth rates colored by Nutrient
+
+interaction.plot(x.factor = gr$Temp_Treat, trace.factor = gr$Nutrient,
+                 response = gr$GrowthRate, fun = mean,
+                 type = "b", legend = FALSE,
+                 xlab = "Temp Treat", ylab="Growth Rate",
+                 pch=19, col = c("gray", "#E7B800","blue","#00AFBB"))
+legend(x=2.5, y=0.4, legend=c("Control","Org","In","InOrg"),
+       col= c("gray", "#E7B800","blue","#00AFBB"),bty="n", pch=19,
+       y.intersp=0.3,x.intersp=0.3)
+
+#### Plot the effect of Nutrient on Growth rates colored by Temperature
+
+interaction.plot(x.factor = gr$Nutrient, trace.factor = gr$Temp_Treat,
+                 response = gr$GrowthRate, fun = mean,
+                 type = "b", legend = FALSE,
+                 xlab = "Nut Treat", ylab="Growth Rate",
+                 pch=c(1,19), col = c("deepskyblue","gray","firebrick"))
+legend(x=2.5, y=0.4, legend=c("Cold","InSitu","Warm"),
+       col = c("deepskyblue","gray","firebrick"),bty="n", pch=19,
+       y.intersp=0.3,x.intersp=0.3)
+
+
+```
+```{r}
+##### WHAT IS THE DIFFERENCE BETWEEN THE ONE-WAY ANOVA AND THE TWO-WAY ANOVA FOR NUTRIENTS????
+
+anova2 <- aov(gr$GrowthRate ~ gr$Nutrient)
+summary(anova2) ### One-way anova
+plot(gr$GrowthRate ~ gr$Nutrient,col=c("gray", "#E7B800","blue","#00AFBB"))
+
+# needs library(ggpubr)
+summary(anova4) ### Two-way anova
+ggboxplot(gr, x = "Temp_Treat", y = "GrowthRate", color = "Nutrient",
+                   palette = c("gray", "#E7B800","blue","#00AFBB"))
+```
+```{r}
+
+############ Excercise 3 (YOUR TURN)      ########### #######
+####  THE IMPORTANCE OF CHECKING INTERACTION      ############
+
+# 1. perform 2 independent one-way anova, one for each factor (Temp/Nut) # Check your independent var=factors
+#2.  perform a two-way anova (remember check for the interaction)
+####  You will need to read new data (two-way.csv)
+
+#read data
+two <- read.csv("two_way.csv")
+head(two)
+
+#Independent variables as factors
+class(two$Temp)
+class(two$Nutr)
+
+two$Temp <- as.factor(two$Tem)
+two$Nutr <- as.factor(two$Nutr)
+
+# One-Way ANOVA Factor1 (temp)
+
+f1 <- aov(Y ~ Temp, data = two)
+summary(f1)
+#p=0.07 p=fail to reject Ho
+plot(TukeyHSD(f1))
+
+# One-Way ANOVA Factor2 (Nutr)
+f2 <- aov(Y ~ Nutr, data = two)
+summary(f2)
+#p=0.6- failt to reject Ho
+plot(TukeyHSD(f2))
+
+####### Now you make a Two-Way ANOVA, Remember to first check for interaction######
+
+#Two-Way ANOVA interaction
+f1f2int <- aov( Y ~ Temp * Nutr, data = two)
+summary(f1f2int)
+
+### ALL pvalues <0.05!! By doing separately one-way anova we fail to reject Ho when is probably false 
+
+###### To determine the size of the interaction use the Eta square 
+### The resulting eta squared value according to Cohen’s (1988) terms would be considered:
+### .01 as a small effect, .06 as a medium effect and above .14 as a large effect.
+
+library(DescTools)
+EtaSq(f1f2int)
+
+
+#Two-Way ANOVA no interaction
+#f1f2 <- aov( Y ~ Temp + Nutr, data = two)
+#summary(f1f2)
+
+#plot intreaction Temp - Nut
+interaction.plot(x.factor = two$Temp, trace.factor = two$Nutr,
+                 response = two$Y, fun = mean,
+                 type = "b", legend = TRUE,
+                 xlab = "Temp", ylab="Growth Rate",
+                 pch=c(1,19), col = c( "#E7B800","#00AFBB"))
+
+ggboxplot(two, x = "Temp", y = "Y", color = "Nutr",
+                   palette = c("#E7B800","#00AFBB"))
+
+####### REMEMBER 
+
+# 1. FIRST CHECK TWO-WAY ANOVA WITH INTERACTION (*)
+# 2. IN NO INTREACTION: TWO-WAY ANOVA WITHOUT INTERACTION (+)
+```
+```{r}
+########################################################################
+########                                                       #########
+########                  EXPORT PVAL tables                   #########
+########                                                       #########
+########################################################################
+
+temp <- as.data.frame(TukeyHSD(anova4)$Temp_Treat)
+nut <-  as.data.frame(TukeyHSD(anova4)$Nutrient)
+tukey <- rbind(temp,nut)
+tukey[,"p adj"] <- round(tukey[,"p adj"],3)
+
+
+write.csv(tukey,paste("Tukey-2W-ANOVA-Temperature-Nutrient.csv"))
+
+###Only significant values
+sig <- which(tukey[,"p adj"]<0.05)
+tukeyS <- tukey[sig,]
+write.csv(tukeyS,paste("Tukey-2W-ANOVA-Temperature-Nutrient_Sig.csv"))
+```
+```{r}
+#######################################################################
+########                                                       #########
+########                  PLOTS                                #########
+########                                                       #########
+########################################################################
+
+
+boxes <- ggboxplot(gr, x = "Temp_Treat", y = "GrowthRate", color = "Nutrient",
+                   palette = c("gray", "#E7B800","blue","#00AFBB"))
+boxes
+#ggboxplot(gr, x = "Nutrient", y = "GrowthRate", color = "Nutrient",palette = c("gray", "#E7B800","blue","#00AFBB"))
+
+lines <- ggline(gr, x = "Temp_Treat", y = "GrowthRate", color = "Nutrient",
+       add = c("mean_se", "dotplot"),
+       palette = c("gray", "#E7B800","blue","#00AFBB"))
+lines
+
+
+#### this gives the same color:
+colors()[8]
+"#66CDAA"
+"aquamarine"
+#http://research.stowers.org/mcm/efg/R/Color/Chart/
+
+
+interaction <- interaction.plot(x.factor = gr$Temp_Treat, trace.factor = gr$Nutrient,
+                 response = gr$GrowthRate, fun = mean,
+                 type = "b", legend = TRUE,
+                 xlab = "Temp Treat", ylab="Growth Rate",
+                 pch=c(1,19), col = c("gray", "#E7B800","blue","#00AFBB"))
+
+
+########################################################################
+########                                                       #########
+########                  EXPORT PLOTS                         #########
+########                                                       #########
+########################################################################
+
+pdf("plot_Temperature-Nutrients.pdf",width=8,height=8)
+lines
+dev.off()
+
+```
+
